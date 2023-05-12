@@ -2,34 +2,35 @@ import Notiflix from 'notiflix';
 import SimpleLightbox from 'simplelightbox';
 import 'simplelightbox/dist/simple-lightbox.min.css';
 
-import { picturesApi } from './js/picturesApi';
-import { respPictures } from './js/respPictures';
+import { getPictures } from './js/picturesApi';
+import { renderGallery } from './js/respPictures';
 
-const form = document.querySelector('.search-form');
-const input = document.querySelector('.search-form-input');
+const searchForm = document.querySelector('.search-form');
+const searchText = document.querySelector('.search-form-input');
 const searchBtn = document.querySelector('.search-form-btn');
 const gallery = document.querySelector('.gallery');
-const loadBtn = document.querySelector('.load-more');
+const loadMoreBtn = document.querySelector('.load-more');
+
+let simpleLightbox = new SimpleLightbox('.gallery a');
 
 let searchTerm = '';
-const perPage = 40;
 let page = 1;
-let SimpleLightbox = new SimpleLightbox('.gallery a');
+const perPage = 40;
 
-form.addEventListener('submit', searchForm);
-loadBtn.addEventListener('click', loadMore);
+searchForm.addEventListener('submit', handleSubmit);
+loadMoreBtn.addEventListener('click', morePagesBtn);
 
-function searchForm(ev) {
-  ev.preventDefault();
+function handleSubmit(event) {
+  event.preventDefault();
   clearGallery();
-  searchTerm = ev.currentTarget.searchQuery.value.trim();
-
+  searchTerm = event.currentTarget.searchQuery.value.trim();
+  // console.log('searchTerm: ', searchTerm);
   if (searchTerm === '') {
     Notiflix.Notify.info('Oops...Nothing entered, please try again.');
     return;
   }
 
-  picturesApi(searchTerm, page, perPage)
+  getPictures(searchTerm, page, perPage)
     .then(foundData => {
       if (foundData.totalHits === 0) {
         Notiflix.Notify.failure(
@@ -42,10 +43,43 @@ function searchForm(ev) {
           `Hooray! We found ${foundData.totalHits} images.`
         );
         if (foundData.totalHits > perPage) {
-          loadBtn.classList.remove('is-hidden');
+          loadMoreBtn.classList.remove('is-hidden');
         }
       }
     })
     .catch(error => console.log(error));
 }
 
+function morePagesBtn() {
+  page++;
+  getPictures(searchTerm, page, perPage)
+    .then(foundData => {
+      const maxPageNum = Math.ceil(foundData.totalHits / perPage);
+      // console.log('maxPageNum: ', maxPageNum);
+      // console.log('Page number: ', page);
+      // console.log('TotalHits found: ', foundData.totalHits);
+      renderGallery(foundData.hits);
+      simpleLightbox.refresh();
+      if (page === maxPageNum) {
+        loadMoreBtn.classList.add('is-hidden');
+        Notiflix.Notify.info(
+          "We're sorry, but you've reached the end of search results."
+        );
+      }
+      const { height: cardHeight } = document
+        .querySelector('.gallery')
+        .firstElementChild.getBoundingClientRect();
+
+      window.scrollBy({
+        top: cardHeight * 2,
+        behavior: 'smooth',
+      });
+    })
+    .catch(error => console.log(error));
+}
+
+function clearGallery() {
+  gallery.innerHTML = '';
+  page = 1;
+  loadMoreBtn.classList.add('is-hidden');
+}
